@@ -10,7 +10,6 @@ import Canvas exposing (..)
 import Canvas.Settings exposing (..)
 import Canvas.Settings.Advanced exposing (shadow)
 import Color exposing (Color)
-import Random
 
 
 type alias Pos2D =
@@ -36,14 +35,9 @@ type alias ParticlesGenerator =
 
 
 -- ------------  GENERATE -------------- ---
-
-
-generate : Int -> List ParticlesGenerator -> List Random.Generator ( Int, Int )
-generate deltaMs =
-    List.Map Random.pair Random.float
-
-
-
+-- generate : Int -> List ParticlesGenerator -> List Random.Generator ( Int, Int )
+-- generate deltaMs =
+--     List.Map Random.pair Random.float
 -- -------------- EVOLVE --------------- ---
 
 
@@ -106,7 +100,7 @@ newVel deltaMs vel =
 
 friction : Pos2D -> Pos2D
 friction p =
-    ( Tuple.first p * 0.9995, Tuple.second p * 0.9995 )
+    ( Tuple.first p * 0.999, Tuple.second p * 0.9995 )
 
 
 
@@ -135,7 +129,11 @@ render gs =
 
 renderGenerator : ParticlesGenerator -> Renderable
 renderGenerator gen =
-    shapes [ fill gen.color, shadow { blur = 1.0, color = Color.black, offset = ( 1.0, 1.0 ) } ]
+    shapes
+        [ fill gen.color
+
+        -- , shadow { blur = 1.0, color = Color.black, offset = ( 1.0, 1.0 ) }
+        ]
         (circle gen.position 3
             :: renderParticles gen.particles
         )
@@ -143,7 +141,7 @@ renderGenerator gen =
 
 renderParticle : Particle -> Shape
 renderParticle { position } =
-    circle position 2.0
+    circle position 3.0
 
 
 renderParticles : List Particle -> List Shape
