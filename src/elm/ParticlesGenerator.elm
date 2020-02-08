@@ -134,7 +134,7 @@ renderGenerator gen =
 
         -- , shadow { blur = 1.0, color = Color.black, offset = ( 1.0, 1.0 ) }
         ]
-        (circle gen.position 3
+        (circle gen.position 1
             :: renderParticles gen.particles
         )
 
@@ -159,13 +159,13 @@ pos2DToColor pos =
     Color.rgb255
         (Tuple.first pos |> round |> to255)
         (Tuple.second pos |> round |> to255)
-        ((Tuple.first pos + Tuple.second pos) |> round |> to255)
+        ((Tuple.first pos * Tuple.second pos) |> round |> to255)
 
 
 createParticlesGenerator : Pos2D -> ParticlesGenerator
 createParticlesGenerator pos =
     { position = pos
-    , createFrequency = 50
+    , createFrequency = 100
     , tick = 0
     , particles = []
     , color = pos2DToColor pos
