@@ -1,0 +1,14 @@
+{
+  "files.autoSave": "afterDelay",
+  "files.autoSaveDelay": 1000,
+  "[elm]": {
+    "editor.formatOnSave": true,
+  },
+  "editor.fontLigatures": true,
+  "editor.fontFamily": "Fira Code, 'Courier New', monospace",
+  "elmLS.trace.server": "off",
+  "elmLS.elmPath": "./node_modules/.bin/elm",
+  "elmLS.elmFormatPath":  "./node_modules/.bin/elm-format",
+  "elmLS.elmTestPath":  "./node_modules/.bin/elm-test",
+  "elmLS.elmAnalyseTrigger": "change"
+}
