@@ -1,5 +1,6 @@
 module ParticlesGenerator exposing
-    ( ParticlesGenerator
+    ( Dim2D
+    , ParticlesGenerator
     , Pos2D
     , createParticlesGenerator
     , evolve
@@ -10,6 +11,11 @@ import Canvas exposing (..)
 import Canvas.Settings exposing (..)
 import Canvas.Settings.Advanced exposing (shadow)
 import Color exposing (Color)
+import Random
+
+
+type alias Dim2D =
+    ( Float, Float )
 
 
 type alias Pos2D =
@@ -30,7 +36,32 @@ type alias ParticlesGenerator =
     , tick : Int
     , particles : List Particle
     , color : Color
+    , dimension : Dim2D
     }
+
+
+createFrquency =
+    15
+
+
+hitFriction =
+    0.9
+
+
+viscosity =
+    0.9995
+
+
+particleRad =
+    12.0
+
+
+gravity =
+    9.8
+
+
+lifetime =
+    1500
 
 
 
@@ -41,23 +72,24 @@ type alias ParticlesGenerator =
 -- -------------- EVOLVE --------------- ---
 
 
-evolve : Int -> List ParticlesGenerator -> List ParticlesGenerator
-evolve deltaMs =
-    evolveGenerator deltaMs |> List.map
+evolve : Int -> Random.Seed -> List ParticlesGenerator -> List ParticlesGenerator
+evolve deltaMs seed =
+    evolveGenerator deltaMs seed |> List.map
 
 
-evolveGenerator : Int -> ParticlesGenerator -> ParticlesGenerator
-evolveGenerator deltaMs pgen =
+evolveGenerator : Int -> Random.Seed -> ParticlesGenerator -> ParticlesGenerator
+evolveGenerator deltaMs seed pgen =
     let
+        -- Decide if we need to generate a new particle
         particles =
             if remainderBy pgen.createFrequency pgen.tick == 0 then
-                newParticle pgen :: pgen.particles
+                newParticle seed pgen :: pgen.particles
 
             else
                 pgen.particles
     in
     { pgen
-        | particles = evolveParticles deltaMs particles
+        | particles = evolveParticles pgen.dimension deltaMs particles
         , tick = pgen.tick + 1
     }
 
@@ -67,21 +99,62 @@ liveParticle p =
     p.tickLeft >= 0
 
 
-evolveParticles : Int -> List Particle -> List Particle
-evolveParticles deltaMs =
-    List.filter liveParticle << List.map (evolveParticle deltaMs)
+evolveParticles : Dim2D -> Int -> List Particle -> List Particle
+evolveParticles dim deltaMs =
+    List.filter liveParticle << List.map (evolveParticle dim deltaMs)
 
 
+evolveParticle : Dim2D -> Int -> Particle -> Particle
+evolveParticle ( size, floor ) deltaMs particle =
+    let
+        ( px, py ) =
+            movePos deltaMs particle.position particle.velocity
 
--- <<
---     List.map <|
---         evolveParticle deltaMs
+        newPos =
+            ( if px < 0 then
+                -1 * px
 
+              else if px > size then
+                px - (px - size)
 
-evolveParticle : Int -> Particle -> Particle
-evolveParticle deltaMs particle =
-    { position = movePos deltaMs particle.position particle.velocity
-    , velocity = newVel deltaMs <| friction particle.velocity
+              else
+                px
+            , if py > floor then
+                py - (py - floor)
+
+              else
+                py
+            )
+
+        ( vx, vy ) =
+            newVel deltaMs particle.velocity
+
+        hit =
+            if px <= 0 || py >= floor || px >= size then
+                hitFriction
+
+            else
+                1.0
+
+        newVelocity =
+            ( (if px <= 0 || px >= size then
+                -1.0 * vx
+
+               else
+                vx
+              )
+                * hit
+            , (if py > floor then
+                -1 * vy
+
+               else
+                vy
+              )
+                * hit
+            )
+    in
+    { position = newPos
+    , velocity = friction <| newVelocity
     , tickLeft = particle.tickLeft - 1
     , color = particle.color
     }
@@ -94,17 +167,13 @@ newVel deltaMs vel =
             toFloat deltaMs / 1000
     in
     ( Tuple.first vel
-    , Tuple.second vel + (9.8 * deltaSec)
+    , Tuple.second vel + (gravity * deltaSec)
     )
 
 
 friction : Pos2D -> Pos2D
-friction p =
-    ( Tuple.first p * 0.999, Tuple.second p * 0.9995 )
-
-
-
--- ( Tuple.first p * 0.995, Tuple.second p * 0.995 )
+friction ( vx, vy ) =
+    ( vx * viscosity, vy * viscosity )
 
 
 movePos : Int -> Pos2D -> Pos2D -> Pos2D
@@ -132,16 +201,24 @@ renderGenerator gen =
     shapes
         [ fill gen.color
 
-        -- , shadow { blur = 1.0, color = Color.black, offset = ( 1.0, 1.0 ) }
+        --        , shadow { blur = 1.0, color = Color.black, offset = ( 1.0, 1.0 ) }
         ]
-        (circle gen.position 3
+        (circle gen.position 4.0
             :: renderParticles gen.particles
         )
 
 
 renderParticle : Particle -> Shape
-renderParticle { position } =
-    circle position 3.0
+renderParticle { position, tickLeft } =
+    let
+        rad =
+            if tickLeft < 1000 then
+                particleRad * (toFloat tickLeft / 1000.0)
+
+            else
+                particleRad
+    in
+    circle position rad
 
 
 renderParticles : List Particle -> List Shape
@@ -151,7 +228,7 @@ renderParticles =
 
 to255 : Int -> Int
 to255 =
-    remainderBy 255
+    remainderBy 200 >> (+) 50
 
 
 pos2DToColor : Pos2D -> Color
@@ -162,29 +239,30 @@ pos2DToColor pos =
         ((Tuple.first pos + Tuple.second pos) |> round |> to255)
 
 
-createParticlesGenerator : Pos2D -> ParticlesGenerator
-createParticlesGenerator pos =
+createParticlesGenerator : Dim2D -> Pos2D -> ParticlesGenerator
+createParticlesGenerator dim pos =
     { position = pos
-    , createFrequency = 50
+    , createFrequency = createFrquency
     , tick = 0
     , particles = []
     , color = pos2DToColor pos
+    , dimension = dim
     }
 
 
-newParticle : ParticlesGenerator -> Particle
-newParticle pg =
+newParticle : Random.Seed -> ParticlesGenerator -> Particle
+newParticle seed pg =
+    let
+        res =
+            Random.step (Random.pair (Random.float -pi pi) (Random.float 8.0 200.0)) seed
+
+        ( angle, intensity ) =
+            Tuple.first res
+
+        -- Random.pair (Random.float 0.2 0.6) (Random.float -0.1 -0.6)
+    in
     { position = pg.position
-    , velocity = ( -1 * (Tuple.first pg.position - 250) / 5, Tuple.second pg.position * -0.3 )
+    , velocity = ( intensity * cos angle, intensity * sin angle )
     , color = pg.color
-    , tickLeft = 5000
+    , tickLeft = lifetime
     }
-
-
-generatorTick : Int -> ParticlesGenerator -> ParticlesGenerator
-generatorTick tick pg =
-    if remainderBy tick pg.createFrequency == 0 then
-        { pg | particles = newParticle pg :: pg.particles }
-
-    else
-        pg
