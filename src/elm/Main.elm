@@ -6,15 +6,17 @@ import Canvas.Settings exposing (fill)
 import Color
 import Html exposing (Html, div, h2)
 import Html.Events.Extra.Mouse exposing (onClick)
-import ParticlesGenerator exposing (ParticlesGenerator, createParticlesGenerator, evolve, render)
+import ParticlesGenerator exposing (Dim2D, ParticlesGenerator, createParticlesGenerator, evolve, render)
+import Random exposing (Generator)
 import Task
 import Time exposing (Posix, every, now, posixToMillis)
 
 
 type alias Model =
-    { dim : Dim
-    , generators : List ParticlesGenerator
+    { dim : Dim2D
+    , particleGenerators : List ParticlesGenerator
     , lastUpdate : Int
+    , seed : Random.Seed
     }
 
 
@@ -40,13 +42,18 @@ update msg model =
     case msg of
         AddParticlesGenerator pos ->
             ( { model
-                | generators = createParticlesGenerator pos :: model.generators
+                | particleGenerators = createParticlesGenerator model.dim pos :: model.particleGenerators
               }
             , Cmd.none
             )
 
         InitTime time ->
-            ( { model | lastUpdate = posixToMillis time }, Cmd.none )
+            ( { model
+                | lastUpdate = posixToMillis time
+                , seed = Random.initialSeed <| posixToMillis time
+              }
+            , Cmd.none
+            )
 
         Tick time ->
             let
@@ -55,7 +62,8 @@ update msg model =
             in
             ( { model
                 | lastUpdate = posixToMillis time
-                , generators = evolve deltaMs model.generators
+                , seed = Random.initialSeed <| posixToMillis time
+                , particleGenerators = evolve deltaMs model.seed model.particleGenerators
               }
             , Cmd.none
             )
@@ -70,12 +78,19 @@ update msg model =
 
 viewApp : Model -> Html Msg
 viewApp model =
+    let
+        ( dimx, dimy ) =
+            model.dim
+
+        dim =
+            ( floor dimx, floor <| dimy )
+    in
     div []
         [ h2 [] [ Html.text "Elm Canvas Animate " ]
-        , Canvas.toHtml ( floor model.dim.w, floor model.dim.h )
+        , Canvas.toHtml dim
             [ onClick (.offsetPos >> AddParticlesGenerator) ]
-            (shapes [ fill Color.darkBlue ] [ rect ( 0, 0 ) model.dim.w model.dim.h ]
-                :: render model.generators
+            (shapes [ fill <| Color.rgb255 10 10 10 ] [ rect ( 0, 0 ) dimx dimy ]
+                :: render model.particleGenerators
             )
         ]
 
@@ -86,11 +101,12 @@ viewApp model =
 
 initApp : Dim -> ( Model, Cmd Msg )
 initApp d =
-    ( { dim = d
-      , generators = []
+    ( { dim = ( d.w, d.h )
+      , particleGenerators = []
       , lastUpdate = 0
+      , seed = Random.initialSeed 0
       }
-    , Task.perform InitTime now
+    , Task.perform InitTime Time.now
     )
 
 
@@ -100,5 +116,5 @@ main =
         { init = initApp
         , view = viewApp
         , update = update
-        , subscriptions = \_ -> every 10 Tick
+        , subscriptions = \_ -> every (1000 / 60) Tick
         }
