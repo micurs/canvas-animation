@@ -42,7 +42,7 @@ update msg model =
     case msg of
         AddParticlesGenerator pos ->
             ( { model
-                | particleGenerators = createParticlesGenerator model.dim pos :: model.particleGenerators
+                | particleGenerators = List.append model.particleGenerators [ createParticlesGenerator model.dim pos ]
               }
             , Cmd.none
             )

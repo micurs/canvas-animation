@@ -41,34 +41,43 @@ type alias ParticlesGenerator =
 
 
 createFrquency =
-    15
+    10
 
 
 hitFriction =
-    0.9
+    1.2
 
 
 viscosity =
-    0.9995
+    0.95
 
 
 particleRad =
-    12.0
+    30.0
 
 
 gravity =
-    9.8
+    29.8
 
 
 lifetime =
-    1500
+    750
 
 
 
 -- ------------  GENERATE -------------- ---
--- generate : Int -> List ParticlesGenerator -> List Random.Generator ( Int, Int )
--- generate deltaMs =
---     List.Map Random.pair Random.float
+
+
+generateVector : Random.Seed -> Pos2D
+generateVector seed =
+    let
+        ( ( angle, intensity ), _ ) =
+            Random.step (Random.pair (Random.float -pi pi) (Random.float 8.0 200.0)) seed
+    in
+    ( intensity * cos angle, intensity * sin angle )
+
+
+
 -- -------------- EVOLVE --------------- ---
 
 
@@ -161,13 +170,13 @@ evolveParticle ( size, floor ) deltaMs particle =
 
 
 newVel : Int -> Pos2D -> Pos2D
-newVel deltaMs vel =
+newVel deltaMs ( velX, velY ) =
     let
         deltaSec =
             toFloat deltaMs / 1000
     in
-    ( Tuple.first vel
-    , Tuple.second vel + (gravity * deltaSec)
+    ( velX
+    , velY + (gravity * deltaSec)
     )
 
 
@@ -177,13 +186,13 @@ friction ( vx, vy ) =
 
 
 movePos : Int -> Pos2D -> Pos2D -> Pos2D
-movePos deltaMs pos vel =
+movePos deltaMs ( posX, posY ) ( velX, velY ) =
     let
         deltaSec =
             toFloat deltaMs / 1000
     in
-    ( deltaSec * Tuple.first vel + Tuple.first pos
-    , deltaSec * Tuple.second vel + Tuple.second pos
+    ( deltaSec * velX + posX
+    , deltaSec * velY + posY
     )
 
 
@@ -192,17 +201,14 @@ movePos deltaMs pos vel =
 
 
 render : List ParticlesGenerator -> List Renderable
-render gs =
-    List.map renderGenerator gs
+render =
+    List.map renderGenerator
 
 
 renderGenerator : ParticlesGenerator -> Renderable
 renderGenerator gen =
     shapes
-        [ fill gen.color
-
-        --        , shadow { blur = 1.0, color = Color.black, offset = ( 1.0, 1.0 ) }
-        ]
+        [ fill gen.color ]
         (circle gen.position 4.0
             :: renderParticles gen.particles
         )
@@ -232,11 +238,11 @@ to255 =
 
 
 pos2DToColor : Pos2D -> Color
-pos2DToColor pos =
+pos2DToColor ( posX, posY ) =
     Color.rgb255
-        (Tuple.first pos |> round |> to255)
-        (Tuple.second pos |> round |> to255)
-        ((Tuple.first pos * Tuple.second pos) |> round |> to255)
+        (posX |> round |> to255)
+        (posY |> round |> to255)
+        ((posX * posY) |> round |> to255)
 
 
 createParticlesGenerator : Dim2D -> Pos2D -> ParticlesGenerator
@@ -252,17 +258,8 @@ createParticlesGenerator dim pos =
 
 newParticle : Random.Seed -> ParticlesGenerator -> Particle
 newParticle seed pg =
-    let
-        res =
-            Random.step (Random.pair (Random.float -pi pi) (Random.float 8.0 200.0)) seed
-
-        ( angle, intensity ) =
-            Tuple.first res
-
-        -- Random.pair (Random.float 0.2 0.6) (Random.float -0.1 -0.6)
-    in
     { position = pg.position
-    , velocity = ( intensity * cos angle, intensity * sin angle )
+    , velocity = generateVector seed
     , color = pg.color
     , tickLeft = lifetime
     }
